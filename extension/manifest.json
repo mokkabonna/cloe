@@ -1,50 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "CLOE — Custom Links Opened Externally",
-  "description": "Selectively open links from PWAs in your system default browser via configurable URL patterns.",
-  "version": "0.1.0",
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
-  "homepage_url": "https://github.com/iltumio/cloe",
-  "permissions": [
-    "nativeMessaging",
-    "storage"
-  ],
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "http://*/*",
-        "https://*/*"
-      ],
-      "js": [
-        "content-main.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    }
-  ],
-  "options_ui": {
-    "page": "options.html",
-    "open_in_tab": true
-  }
+  "name": "CLOE — Teams external links",
+  "description": "Open external links clicked in the Teams PWA using your system default browser.",
+  "version": "0.2.0",
+  "icons": {"16": "icons/icon16.png", "48": "icons/icon48.png", "128": "icons/icon128.png"},
+  "homepage_url": "https://github.com/mokkabonna/cloe",
+  "permissions": ["nativeMessaging"],
+  "background": {"service_worker": "background.js"},
+  "content_scripts": [{
+    "matches": ["https://teams.microsoft.com/*", "https://teams.cloud.microsoft/*"],
+    "js": ["policy.js", "content.js"],
+    "run_at": "document_start"
+  }]
 }
