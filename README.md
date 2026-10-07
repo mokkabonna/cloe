@@ -9,7 +9,9 @@ system default handler (`/usr/bin/xdg-open`).
 - Injects only into `https://teams.microsoft.com/*` and
   `https://teams.cloud.microsoft/*`, `https://outlook.office.com/*`,
   `https://outlook.office365.com/*`, `https://outlook.cloud.microsoft/*`,
-  and `https://outlook.live.com/*`, in the top frame's isolated world.
+  and `https://outlook.live.com/*`, in isolated worlds. Nested frames are inactive
+  except `https://outlook.office.com/hosted/calendar` (and its subpaths), used
+  by Teams' embedded Outlook calendar. Other embedded origins remain excluded.
 - Handles trusted, unmodified left clicks on links in standalone PWA windows
   (including window-controls-overlay mode). Keyboard-activated trusted link
   clicks are also handled. Downloads and modified clicks retain normal behavior.
@@ -20,7 +22,11 @@ system default handler (`/usr/bin/xdg-open`).
 - No page-message bridge, MAIN-world injection, storage, URL logging, settings
   broadcast, regex rules, or automatic navigation interception.
 - The service worker validates Chromium-provided sender metadata and the URL
-  again. It permits one native request at a time and a minimum 500 ms between
+  again. Before opening, it asks the isolated top-frame script to confirm an
+  approved app origin and PWA display mode. This uses extension-only messaging
+  to frame 0; an ordinary website embedding the calendar cannot approve itself.
+  No extra permissions or page-world bridge are required. It permits one native
+  request at a time and a minimum 500 ms between
   requests while that worker lives. This throttle is not a durable quota.
 - The native helper accepts at most 64 KiB per message, checks URL scheme,
   credentials and length, and invokes a fixed executable with a separate URL
@@ -108,6 +114,8 @@ Manual acceptance after installation:
 - A normal external link in Teams opens once through the system browser handler.
 - Teams chat and Microsoft sign-in links stay in Chromium.
 - The same external link in a regular Teams browser tab behaves normally.
+- An external link inside Teams' embedded Outlook calendar opens externally;
+  the same calendar embedded on an unrelated site cannot use the native helper.
 - Synthetic clicks and page `postMessage` calls do not open external browsers.
 - With the native host unavailable, clicking does not navigate the PWA away.
 

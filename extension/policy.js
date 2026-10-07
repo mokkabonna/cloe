@@ -26,6 +26,11 @@ globalThis.cloePolicy = (() => {
     }
   }
   return Object.freeze({
+    isCalendarFrame(value) {
+      const url = parse(value);
+      return !!url && url.origin === 'https://outlook.office.com' &&
+        /^\/hosted\/calendar(?:\/|$)/.test(url.pathname);
+    },
     isAllowedPage(value) {
       const url = parse(value);
       return !!url && appOrigins.has(url.origin);
