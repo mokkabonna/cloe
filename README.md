@@ -1,110 +1,114 @@
-# CLOE — Custom Links Opened Externally
+# CLOE — Teams external links
 
-A Chromium extension that selectively opens links from PWAs in your system default browser.
+A focused Linux fork of [iltumio/cloe](https://github.com/iltumio/cloe).
+Opens external HTTP(S) links clicked in a Chromium Teams PWA through your
+system default handler (`/usr/bin/xdg-open`).
 
-It uses:
-- A Chromium MV3 extension to intercept link clicks in standalone PWA windows
-- A Rust native messaging host to call `xdg-open <url>` (Linux) or `open <url>` (macOS)
-- Configurable URL patterns (regex) to control which links are intercepted
+## Behavior and security boundary
 
-## Quick Install
+- Injects only into `https://teams.microsoft.com/*` and
+  `https://teams.cloud.microsoft/*`, in the top frame's isolated world.
+- Handles trusted, unmodified left clicks on links in standalone PWA windows
+  (including window-controls-overlay mode). Keyboard-activated trusted link
+  clicks are also handled. Downloads and modified clicks retain normal behavior.
+- Keeps links to the two Teams origins and `login.microsoftonline.com`,
+  `login.microsoft.com`, and `login.live.com` in Chromium.
+- External destinations must be HTTP(S), have no embedded credentials, and be
+  at most 8192 characters (the helper additionally limits UTF-8 bytes).
+- No page-message bridge, MAIN-world injection, storage, URL logging, settings
+  broadcast, regex rules, or automatic navigation interception.
+- The service worker validates Chromium-provided sender metadata and the URL
+  again. It permits one native request at a time and a minimum 500 ms between
+  requests while that worker lives. This throttle is not a durable quota.
+- The native helper accepts at most 64 KiB per message, checks URL scheme,
+  credentials and length, and invokes a fixed executable with a separate URL
+  argument and no shell. It waits for the command's exit status.
+- Failed requests do not navigate elsewhere. The console shows a generic warning;
+  copy the link into your browser to retry.
 
-Run the one-liner — it downloads everything and walks you through setup:
+The trusted-click and PWA checks live in the isolated content script. Native
+messaging itself does not prove a user gesture. Teams still controls the content
+and destination of a link the user clicks. This is not a phishing filter or a
+sandbox for the default browser. A link opens using that browser's own sessions.
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/iltumio/cloe/main/scripts/install-all.sh | bash
-```
+Programmatic `window.open` calls, buttons without an anchor, middle clicks, and
+navigation assignments are intentionally not intercepted. Teams compatibility
+must be tested with real links before relying on this fork. Microsoft Safe Links
+are passed through unchanged; redirect destinations are not inspected. Additional
+Teams/authentication origins require a reviewed policy change in
+`extension/policy.js` (and manifest matches for new source pages).
 
-Or install a specific version:
+## Build from reviewed source
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/iltumio/cloe/main/scripts/install-all.sh | bash -s -- v0.1.0
-```
+Requirements: Linux, Node.js with `node:test`, Rust/Cargo, and `/usr/bin/xdg-open`.
+The native dependency versions and checksums are committed in `Cargo.lock`.
 
-The script will:
-1. Download the native host binary (auto-detects OS and architecture)
-2. Download and unpack the extension to `~/.local/share/cloe/extension`
-3. Prompt you to load the extension in Chromium and paste the extension ID
-4. Register the native messaging host
-
-### Manual install
-
-<details>
-<summary>Click to expand step-by-step instructions</summary>
-
-#### 1. Load the extension
-
-- Download `cloe-extension.zip` from the [latest release](https://github.com/iltumio/cloe/releases/latest) and unzip it
-- Open `chrome://extensions`
-- Enable **Developer mode**
-- Click **Load unpacked** and select the unzipped folder
-- Copy the extension ID
-
-#### 2. Install the native host
-
-Run the install script (replace `<extension_id>` with your ID from step 1):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/iltumio/cloe/main/scripts/install.sh | bash -s -- <extension_id>
-```
-
-Or to install a specific version:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/iltumio/cloe/main/scripts/install.sh | bash -s -- <extension_id> v0.1.0
-```
-
-The script auto-detects your OS and architecture (Linux/macOS, x86_64/aarch64), downloads the correct binary, and registers the native messaging host.
-
-#### 3. Restart Chromium and relaunch your PWA windows.
-
-</details>
-
-## Building from source
-
-If you prefer to build locally instead of using pre-built binaries:
-
-```bash
-git clone https://github.com/iltumio/cloe.git
+```sh
+git clone git@github.com:mokkabonna/cloe.git
 cd cloe
-./scripts/install-native-host.sh <extension_id>
+git rev-parse HEAD  # record and review this revision before building
+./scripts/build.sh
 ```
 
-This requires a [Rust toolchain](https://rustup.rs/).
+The script runs regression tests and builds the native helper with `--locked`.
+Cargo may download the locked dependencies on the first run. It does not fetch
+or execute GitHub release binaries, install files, or change browser settings.
+Rust dependencies and the installed toolchain remain part of the build trust
+boundary. There are no automatic updates or release-download installers.
 
-## Configuration
+## Install after review
 
-Open the extension options (`chrome://extensions` → CLOE → Details → Extension options) to:
+1. In the Chromium profile that owns your Teams PWA (Entur's `Profile 2`), open
+   `chrome://extensions`, enable Developer mode, and load this checkout's
+   `extension/` directory unpacked. Do not load it in unrelated profiles.
+2. Copy the extension ID, which must be exactly 32 letters in the range `a`–`p`.
+3. Install the locally built `native-host/target/release/cloe-host` to a stable
+   user-owned location. Register a Chromium native host named
+   `com.iltumio.cloe` with this JSON, replacing both placeholders:
 
-- **Intercept all links** — toggle to open every link externally
-- **URL patterns** — add regex patterns for specific URLs (e.g. `^https://meet\.google\.com/`)
-- **Presets** — quickly add patterns for popular services (Google Meet, Zoom, Teams, etc.)
+   ```json
+   {
+     "name": "com.iltumio.cloe",
+     "description": "Open clicked Teams links in the default browser",
+     "path": "/absolute/path/to/cloe-host",
+     "type": "stdio",
+     "allowed_origins": ["chrome-extension://YOUR_EXTENSION_ID/"]
+   }
+   ```
 
-If no patterns are configured and "Intercept all" is off, no links are intercepted.
+   Standard Chromium reads
+   `~/.config/chromium/NativeMessagingHosts/com.iltumio.cloe.json`.
+   Use your configuration manager for durable installation. On this user's
+   machines, installation belongs in `~/code/system-customizations` and its
+   Makefile; building this repository alone does not install it.
+4. Restart the Teams PWA. Native host registration is shared by Chromium profiles,
+   but only the listed extension ID is allowed to call it. The extension must be
+   enabled in a profile for its content script to run there.
 
-## Supported platforms
+An unpacked extension uses the checkout's live files. Keep the loaded checkout at
+an explicitly reviewed revision, and reload the extension after intentional
+changes. Removing the extension and native host registration disables integration.
 
-| OS    | Architecture | Binary                    |
-|-------|-------------|---------------------------|
-| Linux | x86_64      | `cloe-host-linux-x86_64`  |
-| Linux | aarch64     | `cloe-host-linux-aarch64` |
-| macOS | x86_64      | `cloe-host-macos-x86_64`  |
-| macOS | aarch64     | `cloe-host-macos-aarch64` |
+## Validation
 
-## Structure
+```sh
+node --test tests/*.test.cjs
+cargo test --locked --manifest-path native-host/Cargo.toml
+cargo fmt --check --manifest-path native-host/Cargo.toml
+```
 
-- `extension/` — Chromium extension (MV3)
-- `native-host/` — Rust native messaging host
-- `scripts/install-all.sh` — One-line installer (extension + native host)
-- `scripts/install.sh` — Download + install native host only (requires extension ID)
-- `scripts/install-native-host.sh` — Build from source + install
+Tests use mocked extension APIs and side-effect-free native requests. They do not
+open the real default browser. The built helper also has a process-level framing
+smoke test in the Node test suite when its release binary exists.
 
-## Notes
+Manual acceptance after installation:
 
-- This intercepts HTTP(S) links in standalone PWA display mode — both normal link clicks and programmatic navigations (`window.open`, `location.href`, `location.assign`, `location.replace`).
-- If native messaging fails, it falls back to in-app navigation.
-- Re-run the install script whenever the extension ID changes.
+- A normal external link in Teams opens once through the system browser handler.
+- Teams chat and Microsoft sign-in links stay in Chromium.
+- The same external link in a regular Teams browser tab behaves normally.
+- Synthetic clicks and page `postMessage` calls do not open external browsers.
+- With the native host unavailable, clicking does not navigate the PWA away.
 
 ## License
 
-[MIT](LICENSE)
+MIT; original copyright retained in [LICENSE](LICENSE).
