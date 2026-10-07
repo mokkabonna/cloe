@@ -1,17 +1,19 @@
-# CLOE — Teams external links
+# CLOE — Outlook and Teams external links
 
 A focused Linux fork of [iltumio/cloe](https://github.com/iltumio/cloe).
-Opens external HTTP(S) links clicked in a Chromium Teams PWA through your
+Opens external HTTP(S) links clicked in a Chromium Outlook or Teams PWA through your
 system default handler (`/usr/bin/xdg-open`).
 
 ## Behavior and security boundary
 
 - Injects only into `https://teams.microsoft.com/*` and
-  `https://teams.cloud.microsoft/*`, in the top frame's isolated world.
+  `https://teams.cloud.microsoft/*`, `https://outlook.office.com/*`,
+  `https://outlook.office365.com/*`, `https://outlook.cloud.microsoft/*`,
+  and `https://outlook.live.com/*`, in the top frame's isolated world.
 - Handles trusted, unmodified left clicks on links in standalone PWA windows
   (including window-controls-overlay mode). Keyboard-activated trusted link
   clicks are also handled. Downloads and modified clicks retain normal behavior.
-- Keeps links to the two Teams origins and `login.microsoftonline.com`,
+- Keeps links to the six app origins and `login.microsoftonline.com`,
   `login.microsoft.com`, and `login.live.com` in Chromium.
 - External destinations must be HTTP(S), have no embedded credentials, and be
   at most 8192 characters (the helper additionally limits UTF-8 bytes).
@@ -32,10 +34,10 @@ and destination of a link the user clicks. This is not a phishing filter or a
 sandbox for the default browser. A link opens using that browser's own sessions.
 
 Programmatic `window.open` calls, buttons without an anchor, middle clicks, and
-navigation assignments are intentionally not intercepted. Teams compatibility
+navigation assignments are intentionally not intercepted. Outlook and Teams compatibility
 must be tested with real links before relying on this fork. Microsoft Safe Links
 are passed through unchanged; redirect destinations are not inspected. Additional
-Teams/authentication origins require a reviewed policy change in
+Outlook/Teams/authentication origins require a reviewed policy change in
 `extension/policy.js` (and manifest matches for new source pages).
 
 ## Build from reviewed source

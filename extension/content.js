@@ -4,7 +4,7 @@
   document.addEventListener('click', (event) => {
     if (!event.isTrusted || event.defaultPrevented || event.button !== 0 ||
         event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (!cloePolicy.isTeamsPage(window.location.href)) return;
+    if (!cloePolicy.isAllowedPage(window.location.href)) return;
     if (!window.matchMedia('(display-mode: standalone)').matches &&
         !window.matchMedia('(display-mode: window-controls-overlay)').matches) return;
 

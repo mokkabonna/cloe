@@ -51,7 +51,9 @@ test('manifest limits injection to Teams and has no page bridge, storage, or MAI
   const manifest = JSON.parse(source('manifest.json'));
   assert.deepEqual(manifest.permissions, ['nativeMessaging']);
   assert.deepEqual(manifest.content_scripts, [{
-    matches:['https://teams.microsoft.com/*', 'https://teams.cloud.microsoft/*'],
+    matches:['https://teams.microsoft.com/*', 'https://teams.cloud.microsoft/*',
+      'https://outlook.office.com/*', 'https://outlook.office365.com/*',
+      'https://outlook.cloud.microsoft/*', 'https://outlook.live.com/*'],
     js:['policy.js','content.js'], run_at:'document_start'
   }]);
   // content() has no window messaging APIs; any registration or broadcast fails.
@@ -88,4 +90,19 @@ test('background independently rejects forged senders, unsafe URLs, and rapid re
   complete({ok:false});
   send('https://example.com/'); // Cooldown.
   assert.equal(opened.length, 2);
+});
+test('Outlook sources allow real external clicks while app links and lookalikes remain protected', () => {
+  for (const origin of ['https://outlook.office.com', 'https://outlook.office365.com',
+    'https://outlook.cloud.microsoft', 'https://outlook.live.com']) {
+    const c = content({page:origin + '/mail/'});
+    assert.equal(c.click('https://example.com/'), true);
+    assert.equal(c.click(origin + '/calendar/'), false);
+    assert.equal(c.click('https://teams.cloud.microsoft/'), false);
+    assert.equal(c.click('https://example.com/', {isTrusted:false}), false);
+    assert.equal(c.sent.length, 1);
+    const tab = content({page:origin + '/mail/', standalone:false});
+    assert.equal(tab.click('https://example.com/'), false);
+    const fake = content({page:origin + '.evil.example/'});
+    assert.equal(fake.click('https://example.com/'), false);
+  }
 });
